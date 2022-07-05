@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "init": "deno run --allow-env --allow-run --allow-read --allow-write init.ts",
+    "jwt": "deno run --allow-env --allow-read jwt.ts",
+    "auth": "deno run --allow-env --allow-read --allow-net auth.ts",
+    "get": "deno run --allow-env --allow-read --allow-write --allow-net get.ts",
+    "share": "deno run --allow-env --allow-read --allow-run share.ts"
+  }
+}

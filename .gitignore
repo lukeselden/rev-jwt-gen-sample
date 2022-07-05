@@ -161,3 +161,9 @@ msbuild.wrn
 
 # Visual Studio 2015
 .vs/
+
+# Certificates
+*.pem
+*.key
+*.pfx
+*.cer
