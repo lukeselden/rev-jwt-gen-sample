@@ -1,6 +1,9 @@
 import fs from 'node:fs/promises';
 import { generateKeyPair, exportPKCS8, exportSPKI } from 'jose';
+import forge from 'node-forge';
 import { getCommandLineArgs, isMainEntryPoint, logger, exists, getEnvConfig } from './lib/utils.js';
+
+const {pki, md} = forge;
 
 //#region MAIN
 
@@ -15,6 +18,8 @@ export async function generateSigningKeypair(
     signingKeyPath,
     signingCertPath,
     encryptionCertPath,
+    validDays = 3650,
+    issuer = "rev-jwt-gen",
     overwrite = false
 ) {
     // check to see if this would overwrite existing certs
@@ -31,7 +36,8 @@ export async function generateSigningKeypair(
     // see https://github.com/panva/jose
     const { publicKey, privateKey } = await generateKeyPair("RSA-OAEP", { extractable: true });
     const privatePEM = await exportPKCS8(privateKey);
-    const publicPEM = await exportSPKI(publicKey);
+    const publicKeyPEM = await exportSPKI(publicKey);
+    const publicPEM = generateCert(privatePEM, publicKeyPEM, issuer, validDays);
 
     logger.debug('...Saving Files...');
 
@@ -40,6 +46,8 @@ export async function generateSigningKeypair(
     await fs.writeFile(signingCertPath, publicPEM);
     // write empty file, waiting to be filled with cert from Rev
     await fs.writeFile(encryptionCertPath, '');
+
+    return publicPEM;
 }
 
 //#endregion
@@ -49,6 +57,8 @@ export async function generateSigningKeypair(
 if (isMainEntryPoint(import.meta.url)) {
     try {
         const args = getCommandLineArgs();
+        const days = parseInt(args.days, 10) || 3650;
+        const issuer = args.issuer || "rev-jwt-gen";
 
         // location of signing/encryption certificates (see README.md)
         // pulled from commandline-args or env variables
@@ -61,7 +71,7 @@ if (isMainEntryPoint(import.meta.url)) {
         // customize output filenames
         const shouldOverwrite = !!args.y || !!args.force;
 
-        await generateSigningKeypair(signingKeyPath, signingCertPath, encryptionCertPath, shouldOverwrite);
+        const signingCertText = await generateSigningKeypair(signingKeyPath, signingCertPath, encryptionCertPath, days, issuer, shouldOverwrite);
 
         logger.debug(`Done.
 
@@ -71,10 +81,12 @@ NEXT STEPS:
 3.  If "Enable JWT Authentication & Authorization" is not already checked
     enable it and click Save at the bottom of the page.
 4.  Go back to JWT section and click "+ Add New"
-5.  Paste in the contents of ${signingKeyPath} (output below).
+5.  Paste in the contents of ${signingCertPath} (output below).
 6.  Download the encryption cert and save as ${encryptionCertPath}
     (replace the current empty file)
 7.  Test out the results with jwt.js and auth.js
+
+${signingCertText}
 `);
         process.exit();
     } catch (error) {
@@ -98,9 +110,35 @@ OPTIONS:
     --sign      [string]              Signing Private Key Path (DEFAULT: set in .env file)
     --signcert  [string]              Signing Public  Key Path (DEFAULT: set in .env file)
     --encrypt   [string]              Encryption Key Path (DEFAULT: set in .env file)
+    --days  [number]                  Days signing cert is valid for. (DEFAULT: 3650 / 10 years)
+    --iss   [string]                  Subject of self-signed certificate. (DEFAULT: rev-jwt-gen)
     -y, --force                       Overwrite existing files
 `);
     process.exit(1);
+}
+
+/**
+ * Use node-forge to create an X.509 certificate
+ * @param {string} privateKeyPEM 
+ * @param {string} publicKeyPEM 
+ * @param {string} issuer 
+ * @param {number} validDays 
+ */
+function generateCert(privateKeyPEM, publicKeyPEM, issuer, validDays) {
+    const cert = pki.createCertificate();
+    cert.publicKey = pki.publicKeyFromPem(publicKeyPEM);
+    cert.serialNumber = Math.random()
+        .toString(16)
+        .slice(2, 10)
+        .toUpperCase()
+        .replace(/^[01]/, '2')
+    cert.validity.notBefore = new Date();
+    cert.validity.notAfter = new Date();
+    cert.validity.notAfter.setDate(cert.validity.notAfter.getDate() + validDays);
+    cert.setIssuer([{ name: 'commonName', value: issuer }]);
+    cert.setSubject([{ name: 'commonName', value: issuer }]);
+    cert.sign(pki.privateKeyFromPem(privateKeyPEM), md.sha256.create());
+    return pki.certificateToPem(cert);
 }
 
 //#endregion
