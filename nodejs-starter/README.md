@@ -1,6 +1,6 @@
 # Vbrick Rev Sample JWT Generation
 
-These are sample code to generate JSON Web Token (JWT) that can be used to interact with Vbrick Rev Platform. For more information on Vbrick Rev JWT please refer to https://revdocs.vbrick.com/reference/jwt-authentication 
+These are sample code to generate JSON Web Token (JWT) that can be used to interact with Vbrick Rev Platform. For more information on Vbrick Rev JWT please refer to https://revdocs.vbrick.com/reference/jwt-authentication
 
 ## Getting Started
 
@@ -11,9 +11,10 @@ These steps assume you're just getting started using the JWT authentication feat
 Use included `init.js` script to use `jose` library to generate keypair, or use openssl:
 
 ```sh
-# Option 1 - private key via genpkey
+# Option 1 - private key via genpkey, then output public key in X.509 cert format
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out signing.private.key
 openssl rsa -in signing.private.key -outform PEM -pubout -out signing.public.key
+openssl req -x509 -nodes -key signing.private.key -days 3650 -subj /CN=rev-jwt-gen -batch -pkeyopt rsa_padding_mode:oaep -out signing.public.pem
 
 # Option 2 - private key via genrsa then convert
 openssl genrsa -out tmp.rsa.key
