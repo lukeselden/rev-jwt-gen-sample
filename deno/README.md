@@ -7,17 +7,10 @@ This sample code makes use of the [`@panva/jose`](https://github.com/panva/jose/
 *NOTE: steps assume [Deno](https://deno.land) v1.20 or above*
 
 1. Copy `.env.example` to `.env` and set the `REV_JWT_URL` to the URL of your Rev tenant
-2. Configure the Signing/Encryption certificates. Either:
-    * If JWT authentication is already set up Rev: update PEM files in `certs` directory with relevant certificates/keys
-    * Run `deno task init` to create new Signing cert/key, then follow steps on screen.
-
-
+2. Configure the Signing/Encryption certificates following the openssl steps in the [main readme](https://github.com/vbrick/rev-jwt-gen-sample/README.md)
 
 ## Commands
 Get help for scripts using `deno task <task> --help` or `deno run --allow-all <task>.ts --help`.
-
-### `deno task init`
-Create Signing certificate/key - *(assumes OpenSSL in path)*
 
 ### `deno task jwt <username or email>`
 Generate a JWT for the given user and dump to stdout
