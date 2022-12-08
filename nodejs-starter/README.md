@@ -1,6 +1,6 @@
 # Vbrick Rev Sample JWT Generation
 
-These are sample code to generate JSON Web Token (JWT) that can be used to interact with Vbrick Rev Platform. For more information on Vbrick Rev JWT please refer to https://revdocs.vbrick.com/reference/jwt-authentication 
+These are sample code to generate JSON Web Token (JWT) that can be used to interact with Vbrick Rev Platform. For more information on Vbrick Rev JWT please refer to https://revdocs.vbrick.com/reference/jwt-authentication
 
 ## Getting Started
 
@@ -8,26 +8,17 @@ These steps assume you're just getting started using the JWT authentication feat
 
 1. Generate Signing Public/Private key pair *(PEM format)*
 
-Use included `init.js` script to use `jose` library to generate keypair, or use openssl:
+    This repository includes a `init.js` script to use `jose` library to generate the required keypair
 
-```sh
-# Option 1 - private key via genpkey
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out signing.private.key
-openssl rsa -in signing.private.key -outform PEM -pubout -out signing.public.key
+    ```sh
+    node init.js --signing signing.private.key --signcert signing.public.pem
+    ```
 
-# Option 2 - private key via genrsa then convert
-openssl genrsa -out tmp.rsa.key
-openssl pkcs8 -in tmp.rsa.key -nocrypt -topk8 -out signing.private.key
-rm tmp.rsa.key
-openssl rsa -in signing.private.key -outform PEM -pubout -out signing.public.key
-
-# Option 3 - use included init tool
-node init.js --signing signing.private.key --signcert signing.public.key
-```
+    Alternatively, you can follow the openssl steps in the [main readme](https://github.com/vbrick/rev-jwt-gen-sample/README.md)
 
 2. Enable JWT Signing in Rev Admin and click save.
 3. Add signing certificate in JWT section and download/copy resulting encryption certificate.
-4. Update `.env` file with paths to certs and REV URL
+4. Copy `.env.example` to `.env` and update the file with paths to certs and REV URL
 5. Use signing/encryption certs to generate JWT *(`jwt.js`)*
 
 ## Contents
