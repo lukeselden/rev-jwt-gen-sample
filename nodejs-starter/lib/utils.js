@@ -31,8 +31,8 @@ export function getEnvConfig(args = getCommandLineArgs()) {
     return {
         revUrl: args.url                 || env.REV_JWT_URL,
         signingKeyPath: args.sign        || env.REV_JWT_SIGNING_KEY     || 'signing.private.key',
-        signingCertPath: args.signcert   || env.REV_JWT_SIGNING_CERT    || 'signing.public.key',
-        encryptionCertPath: args.encrypt || env.REV_JWT_ENCRYPTION_CERT || 'encrypt.public.key'
+        signingCertPath: args.signcert   || env.REV_JWT_SIGNING_CERT    || 'signing.public.pem',
+        encryptionCertPath: args.encrypt || env.REV_JWT_ENCRYPTION_CERT || 'encrypt.public.pem'
     };
 }
 

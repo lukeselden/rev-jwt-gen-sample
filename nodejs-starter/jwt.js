@@ -136,7 +136,7 @@ EXAMPLE (simple, defaults set in .env, 60 min expiration)
 node jwt.js media.viewer@mycompany.com
 
 EXAMPLE (verbose, no .env file)
-node jwt.js media.viewer@mycompany.com  --exp 1662996000 --nbf 1662995100 --url "https://my.rev.url" --sign "signing.private.key" --encrypt "encryption.key"
+node jwt.js media.viewer@mycompany.com  --exp 1662996000 --nbf 1662995100 --url "https://my.rev.url" --sign "signing.private.key" --encrypt "encrypt.public.pem"
 `);
     process.exit(1);
 }
