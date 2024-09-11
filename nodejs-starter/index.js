@@ -1,5 +1,7 @@
+// @ts-check
+
 import { getCommandLineArgs, getEnvConfig, isMainEntryPoint, logger } from './lib/utils.js';
-import {generateJWT} from './jwt.js';
+import {externalUserJWTPayload, generateJWT, internalUserJWTPayload} from './jwt.js';
 import {getAccessToken} from './auth.js';
 import {makeRevRequest} from './request.js';
 
@@ -9,6 +11,7 @@ if (isMainEntryPoint(import.meta.url)) {
         // dynamic inputs - Specify JWT subject
         const args = getCommandLineArgs();
         const usernameOrEmail = args._?.[0] || args.sub; // REQUIRED, must exist in Rev
+        const videoId = args.video;
 
         if (args.help) {
             showHelp();
@@ -25,7 +28,11 @@ if (isMainEntryPoint(import.meta.url)) {
         // create JWT that is good for one hour
         const exp = Date.now() / 1000 + 3600;
 
-        const jwt = await generateJWT(usernameOrEmail, exp, undefined, signingKeyPath, encryptionCertPath);
+        const payload = videoId
+            ? externalUserJWTPayload(videoId, usernameOrEmail, exp)
+            : internalUserJWTPayload(usernameOrEmail, exp);
+
+        const jwt = await generateJWT(payload, signingKeyPath, encryptionCertPath);
         logger.debug(`JWT for ${usernameOrEmail}`, jwt);
         
         logger.debug('Trading JWT for Access Token for API usage...');
@@ -51,14 +58,30 @@ if (isMainEntryPoint(import.meta.url)) {
         const extendResult = await makeRevRequest(revUrl, '/api/v2/user/extend-session', accessToken, 'POST');
         logger.info(extendResult);
 
-        logger.debug('Searching for the latest video uploaded to Rev (that this user can view)');
-        const videoResults = await makeRevRequest(revUrl, '/api/v2/videos/search?count=1&sortField=whenUploaded&sortDirection=desc', accessToken);
-        const video = videoResults.videos[0];
-        const playbackUrl = new URL(video.playbackUrl);
-        // add jwt_token query param to embed a video for a specific user
-        playbackUrl.searchParams.set('jwt_token', jwt);
+        let playbackUrl;
+        let title = 'NOT FOUND';
+        if (videoId) {
+            logger.debug(`Testing for video access for ${videoId}`);
+            const video = await makeRevRequest(revUrl, `/api/v2/videos/${videoId}/playback-url`, accessToken);
+            playbackUrl = new URL(video.playbackUrl);
+            title = video.title;
+        } else {
+            logger.debug('Searching for the latest video uploaded to Rev (that this user can view)');
+            const videoResults = await makeRevRequest(revUrl, '/api/v2/videos/search?count=1&sortField=whenUploaded&sortDirection=desc', accessToken);
+            const video = videoResults.videos[0];
+            playbackUrl = new URL(video.playbackUrl);
+            title = video.title;
+        }
 
-        logger.info(`Custom embed URL for ${userDetails.username} to view the video ${video.title}:`, playbackUrl.toString());
+        if (playbackUrl) {
+            // add jwt_token query param to embed a video for a specific user
+            playbackUrl.searchParams.set('jwt_token', jwt);
+    
+            logger.info(`Custom embed URL for ${userDetails.username} to view the video ${title}:`, playbackUrl.toString());
+        } else {
+            logger.warn('No available videos found');
+        }
+
     } catch (error) {
         logger.error(error);
     }

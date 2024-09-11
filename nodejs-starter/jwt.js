@@ -4,29 +4,48 @@ import fs from 'node:fs/promises';
 
 //#region MAIN
 
-export async function generateJWT(
-    usernameOrEmail,
-    expiration,
-    notBefore,
-    signingKeyPath,
-    encryptionCertPath
-) {
+export function internalUserJWTPayload(usernameOrEmail, expiration, notBefore) {
     // Actual body of JWT. All below claims must be included
-    const JWTPayload = {
+    const payload = {
         aud: "rev",                   // audience claim is always 'rev'
         iss: "rev-jwt-gen-sample",    // can be any string
         res: "*",                     // '*' means allow content access based on user's Rev permissions
-        sub: usernameOrEmail,         // REQUIRED, user must exist in Rev
+        sub: usernameOrEmail,         // user must exist in Rev,
         exp: Math.floor(expiration)   // expiration time in epoch seconds (seconds since 1970-01-01)
     };
 
     if (notBefore) {
-        JWTPayload.nbf = Math.floor(notBefore);   // not before restriction is optional
+        payload.nbf = Math.floor(notBefore);   // not before restriction is optional
         // NOTE: must be integer, not float, hence the floor()
     }
+    return payload;
+}
 
+export function externalUserJWTPayload(videoId, email = '', expiration, notBefore) {
+    // Actual body of JWT. All below claims must be included
+    const payload = {
+        aud: "rev",                   // audience claim is always 'rev'
+        iss: "rev-jwt-gen-sample",    // can be any string
+        res: videoId,                 // Video ID to grant access
+        sub: email,                   // OPTIONAL provide email address for analytics reporting
+        role: 'mv',                   // REQUIRED - indicate temporary media viewer right
+        exp: Math.floor(expiration)   // expiration time in epoch seconds (seconds since 1970-01-01)
+    };
+
+    if (notBefore) {
+        payload.nbf = Math.floor(notBefore);   // not before restriction is optional
+        // NOTE: must be integer, not float, hence the floor()
+    }
+    return payload;
+}
+
+export async function generateJWT(
+    jwtPayload,
+    signingKeyPath,
+    encryptionCertPath
+) {
     // generate signed JWT using jose library
-    const signer = await new SignJWT(JWTPayload)
+    const signer = await new SignJWT(jwtPayload)
         .setProtectedHeader({ alg: "RS256" });
 
     const signingKey = await fs.readFile(signingKeyPath, { encoding: 'utf-8' });
@@ -61,10 +80,12 @@ if (isMainEntryPoint(import.meta.url)) {
         const args = getCommandLineArgs();
 
         // dynamic inputs - Specify JWT subject and JWT validity date range
-        const usernameOrEmail = args._?.[0] || args.sub; // REQUIRED, must exist in Rev
-        const expirationArg = args.exp;                  // Expiration time in epoch seconds
-        const expirationMinutes = args.minutes || 60;    // Alternative, specify # minutes from now
-        const notBeforeClaim = args.nbf;                 // Not Before time in epoch seconds
+        const usernameOrEmail   = args._?.[0] || args.sub; // IF SSO - must exist in Rev
+                                                           // IF External Viewer must be blank or email
+        const expirationArg     = args.exp;                // Expiration time in epoch seconds
+        const expirationMinutes = args.minutes || 60;      // Alternative, specify # minutes from now
+        const notBeforeClaim    = args.nbf;                // Not Before time in epoch seconds
+        const videoId           = args.video || args.res   // If external viewer specify resource
 
         // static inputs - Your Rev tenant's URL and signing/encryption certificates (see README.md)
         // pulled from commandline-args or env variables
@@ -82,7 +103,12 @@ if (isMainEntryPoint(import.meta.url)) {
         if (!revUrl) {
             throw 'Must specify Rev URL using --url arg or REV_JWT_URL environment variable';
         }
-        if (!usernameOrEmail) {
+        if (videoId) {
+            // minimal regex test for if value is email address
+            // if (usernameOrEmail && !/.+@.+/.test(usernameOrEmail)) {
+            //     throw 'External Viewer Subject claim must be blank of email address';
+            // }
+        } else if (!usernameOrEmail) {
             throw 'Must specify Subject claim (username or email) commandline argument';
         }
 
@@ -91,10 +117,20 @@ if (isMainEntryPoint(import.meta.url)) {
         // make sure exp/nbf are set to safe values
         validateTimeRange(expirationClaim, notBeforeClaim);
 
+        let payload;
+        // if videoId specified then generate JWT for external user
+        if (videoId) {
+            logger.debug(`Creating Trusted Public Access token for video ${videoId}`);
+            payload = externalUserJWTPayload(videoId, usernameOrEmail, expirationClaim, notBeforeClaim);
+        } else {
+            logger.debug(`Creating token for Rev User ${usernameOrEmail}`);
+            payload = internalUserJWTPayload(usernameOrEmail, expirationClaim, notBeforeClaim);
+        }
+
+        logger.debug('Payload is', payload);
+
         const jwt = await generateJWT(
-            usernameOrEmail,
-            expirationClaim,
-            notBeforeClaim,
+            payload,
             signingKeyPath,
             encryptionCertPath
         );
@@ -118,22 +154,27 @@ function showHelp() {
 Generate a JWT for authenticating with Vbrick Rev
 
 USAGE:
+INTERNAL USER (Video Access by Rev User Permissions)
 node jwt.js <subject> [...flags]
 
 ARGS:
     <subject>                       sub claim (username or email of Rev user)
-                                    NOTE: user MUST exist in Rev
-
+                                    NOTE: user MUST exist in Rev unless --videoId specified
 OPTIONS:
+  --video    [string]               Specify Video ID to allow External Viewer to access
+                                    Subject must be blank or an email address.
+  --minutes  [number]               Set expiration date to X minutes in the future (DEFAULT: 60)
   --exp:     [number]               Expiration date in epoch seconds (DEFAULT: derive from --minutes)
   --nbf      [number]               Not Before date in epoch seconds
-  --minutes  [number]               Set expiration date to X minutes in the future (DEFAULT: 60)
   --url      [string]               Rev URL (DEFAULT: set in .env file)
   --encrypt  [string]               Encryption Key Path (DEFAULT: set in .env file)
   --sign     [string]               Signing Private Key Path (DEFAULT: set in .env file)
 
 EXAMPLE (simple, defaults set in .env, 60 min expiration)
 node jwt.js media.viewer@mycompany.com
+
+EXAMPLE (external viewer)
+node jwt.js external.user@gmail.com --videoId 12341234-1234-1234-123412341234
 
 EXAMPLE (verbose, no .env file)
 node jwt.js media.viewer@mycompany.com  --exp 1662996000 --nbf 1662995100 --url "https://my.rev.url" --sign "signing.private.key" --encrypt "encrypt.public.pem"

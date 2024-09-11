@@ -46,6 +46,53 @@ Once configured JWT authentication can be used to:
 
 **NOTE:** The `sub` *(subject)* value when generating a JWT **MUST** match the username or email address of a valid Rev user. You can only have one active JWT authentication session for a given named user at a time.
 
+## Trusted Access Configuration
+
+1. Enable Trusted Access in Rev Admin -> System Settings -> Content Restriction "Public Access" section.
+2. For any video that will be configured for external access update the "Access Control" settings accordingly. This shows in the Video Details API as `enableExternalApplicationAccess: true`
+
+#### Old Payload (Rev User JWT):
+
+JWT for Rev User with email/username `username.or.email@existing.rev.user` - grants access to videos user has access to:
+
+```js
+{
+    "aud": "rev",
+    "iss": "acme-arbitrary-value",
+    "res": "*",
+    "sub": "username.or.email@existing.rev.user",
+    "exp": 123412341234
+}
+```
+#### New Payload (External Viewer JWT):
+
+JWT for guest viewer for video with video id `a4a8775a-daa5-4dee-8b67-3d2c1125619d`. Note the added `"role": "mv"` property. User will be reported in analytics as some arbitrary "Guest" value:
+
+```json
+{
+    "aud": "rev",
+    "iss": "acme-arbitrary-value",
+    "res": "a4a8775a-daa5-4dee-8b67-3d2c1125619d",
+    "sub": "",
+    "role": "mv",
+    "exp": 123412341234
+}
+```
+
+JWT for guest viewer for video with video id `a4a8775a-daa5-4dee-8b67-3d2c1125619d`. User will be reported in analytics with the supplied "sub" as the email address.
+
+```json
+{
+    "aud": "rev",
+    "iss": "acme-arbitrary-value",
+    "res": "a4a8775a-daa5-4dee-8b67-3d2c1125619d",
+    "sub": "guest1234_gmail.com@external.mail",
+    "role": "mv",
+    "exp": 123412341234
+}
+```
+
+
 ## Key Rotation
 
 The encryption certificate that Rev generates is valid for two years. Rev allows having two active signing certificate entries at a time to allow key rotation.
