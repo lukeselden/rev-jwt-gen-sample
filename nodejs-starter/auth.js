@@ -1,5 +1,4 @@
 import { getCommandLineArgs, getEnvConfig, isMainEntryPoint, logger, readErrorResponse } from './lib/utils.js';
-import { fetch } from 'undici';
 
 //#region MAIN
 /**

@@ -1,4 +1,3 @@
-import { fetch, Headers } from 'undici';
 import { getCommandLineArgs, getEnvConfig, isMainEntryPoint, logger, readErrorResponse } from './lib/utils.js';
 
 //#region MAIN
@@ -109,8 +108,8 @@ USAGE:
 node request.js <endpoint> <token> [...flags]
 
 ARGS:
-  <endpoint>                           JWT token generated using jwt.js
-  <token>                           JWT token generated using jwt.js
+  <endpoint>                        Relative URL for Rev
+  <token>                           Access token generated using auth.js
 
 OPTIONS:
   --endpoint [string]               Relative URL for Rev
